@@ -3,13 +3,14 @@ module App
 open Elmish
 open Elmish.React
 open Feliz
+open System
 
 type Todo =
-    { Id: int
+    { Id: Guid
       Description: string
       Completed: bool }
 
-type TodoBeingEdited = { Id: int; Description: string }
+type TodoBeingEdited = { Id: Guid; Description: string }
 
 type State =
     { TodoList: Todo list
@@ -19,17 +20,16 @@ type State =
 type Msg =
     | AddNewTodo
     | SetNewTodo of string
-    | DeleteTodo of int
-    | ToggleCompleted of int
-    | StartEditingTodo of int
+    | DeleteTodo of Guid
+    | ToggleCompleted of Guid
+    | StartEditingTodo of Guid
     | SetEditedDescription of string
     | CancelEdit
     | ApplyEdit
-// | SaveEditedTodo of int
 
 let init () =
     { TodoList =
-        [ { Id = 1
+        [ { Id = Guid.NewGuid()
             Description = "initial"
             Completed = false } ]
       NewTodo = ""
@@ -46,15 +46,10 @@ let toggleCompleted state id =
             todo)
 
 let addNewTodo state =
-    let nextTodoId =
-        match state.TodoList with
-        | [] -> 1
-        | _ -> state.TodoList |> List.map (fun todo -> todo.Id) |> List.max |> (+) 1
-
     { state with
         NewTodo = ""
         TodoList =
-            { Id = nextTodoId
+            { Id = Guid.NewGuid()
               Description = state.NewTodo
               Completed = false }
             :: state.TodoList }
@@ -225,4 +220,4 @@ Program.mkSimple init update render
 |> Program.run
 
 
-// continue from here! https://zaid-ajaj.github.io/the-elmish-book/#/chapters/elm/todo-app-part3
+// continue from here! https://zaid-ajaj.github.io/the-elmish-book/#/chapters/elm/todo-app-exercises
