@@ -12,10 +12,16 @@ type Todo =
 
 type TodoBeingEdited = { Id: Guid; Description: string }
 
+type Filter =
+    | Completed
+    | All
+    | NotCompleted
+
 type State =
     { TodoList: Todo list
       NewTodo: string
-      TodoBeingEdited: TodoBeingEdited option }
+      TodoBeingEdited: TodoBeingEdited option
+      Filter: Filter }
 
 type Msg =
     | AddNewTodo
@@ -26,14 +32,19 @@ type Msg =
     | SetEditedDescription of string
     | CancelEdit
     | ApplyEdit
+    | SetFilter of Filter
 
 let init () =
     { TodoList =
         [ { Id = Guid.NewGuid()
             Description = "initial"
-            Completed = false } ]
+            Completed = false }
+          { Id = Guid.NewGuid()
+            Description = "done this one"
+            Completed = true } ]
       NewTodo = ""
-      TodoBeingEdited = None }
+      TodoBeingEdited = None
+      Filter = All }
 
 
 let toggleCompleted state id =
@@ -59,6 +70,7 @@ let update (msg: Msg) (state: State) : State =
     printfn "Updating state %A" state
 
     match msg with
+    | SetFilter filter -> { state with Filter = filter }
     | CancelEdit -> { state with TodoBeingEdited = None }
     | ApplyEdit ->
         match state.TodoBeingEdited with
@@ -203,17 +215,49 @@ let renderEditForm todoBeingEdited dispatch =
                             prop.children [ Html.i [ prop.classes [ "fa"; "fa-arrow-right" ] ] ] ] ] ] ]
 
 let todoList state (dispatch: Msg -> unit) =
+    let activeTodos =
+        state.TodoList
+        |> List.filter (fun todo ->
+            match state.Filter with
+            | All -> true
+            | Completed -> todo.Completed
+            | NotCompleted -> not todo.Completed)
+
     Html.ul
         [ prop.children
-              [ for todo in state.TodoList ->
+              [ for todo in activeTodos ->
                     match state.TodoBeingEdited with
                     | Some todoBeingEdited when todoBeingEdited.Id = todo.Id -> renderEditForm todoBeingEdited dispatch
                     | _ -> renderTodo todo dispatch ] ]
 
-// TODO: can we get onto the 'Some' path earlier? i.e. find todoBeingEdited before looping over TodoList?
+let renderFilterTabs (state: State) (dispatch: Msg -> unit) =
+    div
+        [ "tabs"; "is-toggle"; "is-fullwidth" ]
+        [ Html.ul
+              [ Html.li
+                    [ prop.className (if state.Filter = All then "is-active" else "")
+                      prop.children [ Html.a [ prop.text "All"; prop.onClick (fun _ -> dispatch (SetFilter All)) ] ] ]
+
+                Html.li
+                    [ prop.className (if state.Filter = Completed then "is-active" else "")
+                      prop.children
+                          [ Html.a
+                                [ prop.text "Completed"
+                                  prop.onClick (fun _ -> dispatch (SetFilter Completed)) ] ] ]
+
+                Html.li
+                    [ prop.className (if state.Filter = NotCompleted then "is-active" else "")
+                      prop.children
+                          [ Html.a
+                                [ prop.text "Not Completed"
+                                  prop.onClick (fun _ -> dispatch (SetFilter NotCompleted)) ] ] ] ] ]
 
 let render (state: State) (dispatch: Msg -> unit) =
-    Html.div [ appTitle; newTodoInputField state dispatch; todoList state dispatch ]
+    Html.div
+        [ appTitle
+          newTodoInputField state dispatch
+          renderFilterTabs state dispatch
+          todoList state dispatch ]
 
 Program.mkSimple init update render
 |> Program.withReactSynchronous "elmish-app"
