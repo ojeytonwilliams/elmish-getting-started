@@ -8,9 +8,9 @@ open System
 type Todo =
     { Id: Guid
       Description: string
+      EditDescription: string
+      BeingEdited: bool
       Completed: bool }
-
-type TodoBeingEdited = { Id: Guid; Description: string }
 
 type Filter =
     | Completed
@@ -20,7 +20,6 @@ type Filter =
 type State =
     { TodoList: Todo list
       NewTodo: string
-      TodoBeingEdited: TodoBeingEdited option
       Filter: Filter }
 
 type Msg =
@@ -29,21 +28,29 @@ type Msg =
     | DeleteTodo of Guid
     | ToggleCompleted of Guid
     | StartEditingTodo of Guid
-    | SetEditedDescription of string
-    | CancelEdit
-    | ApplyEdit
+    | SetEditedDescription of Guid * string
+    | CancelEdit of Guid
+    | ApplyEdit of Guid
     | SetFilter of Filter
 
 let init () =
     { TodoList =
         [ { Id = Guid.NewGuid()
             Description = "initial"
+            EditDescription = "initial"
+            BeingEdited = false
             Completed = false }
           { Id = Guid.NewGuid()
             Description = "done this one"
-            Completed = true } ]
+            EditDescription = "done this one"
+            BeingEdited = false
+            Completed = true }
+          { Id = Guid.NewGuid()
+            Description = "being edited"
+            EditDescription = "being edited"
+            BeingEdited = true
+            Completed = false } ]
       NewTodo = ""
-      TodoBeingEdited = None
       Filter = All }
 
 
@@ -62,6 +69,8 @@ let addNewTodo state =
         TodoList =
             { Id = Guid.NewGuid()
               Description = state.NewTodo
+              EditDescription = state.NewTodo
+              BeingEdited = false
               Completed = false }
             :: state.TodoList }
 
@@ -71,42 +80,49 @@ let update (msg: Msg) (state: State) : State =
 
     match msg with
     | SetFilter filter -> { state with Filter = filter }
-    | CancelEdit -> { state with TodoBeingEdited = None }
-    | ApplyEdit ->
-        match state.TodoBeingEdited with
-        | None -> state
-        | Some edited when edited.Description = "" -> state
-        | Some edited ->
-            let mapToEdited (todos: Todo list) =
-                todos
+    | CancelEdit id ->
+        { state with
+            TodoList =
+                state.TodoList
                 |> List.map (fun todo ->
-                    if todo.Id = edited.Id then
-                        { todo with
-                            Description = edited.Description }
+                    if todo.Id = id then
+                        { todo with BeingEdited = false }
                     else
-                        todo)
+                        todo) }
+    | ApplyEdit id ->
+        let todoList =
+            state.TodoList
+            |> List.map (fun todo ->
+                if todo.Id = id then
+                    { todo with
+                        Description = todo.EditDescription
+                        BeingEdited = false }
+                else
+                    todo)
 
-            let newTodoList = mapToEdited state.TodoList
-
-            { state with
-                TodoList = newTodoList
-                TodoBeingEdited = None }
+        { state with TodoList = todoList }
 
     | StartEditingTodo id ->
-        let editedTodo =
+        let todoList =
             state.TodoList
-            |> List.tryFind (fun todo -> todo.Id = id)
-            |> Option.map (fun todo ->
-                { Id = todo.Id
-                  Description = todo.Description })
+            |> List.map (fun todo ->
+                if todo.Id = id then
+                    { todo with BeingEdited = true }
+                else
+                    todo)
 
-        { state with
-            TodoBeingEdited = editedTodo }
-    | SetEditedDescription edit ->
-        { state with
-            TodoBeingEdited =
-                state.TodoBeingEdited
-                |> Option.map (fun todo -> { todo with Description = edit }) }
+
+        { state with TodoList = todoList }
+    | SetEditedDescription(id, edit) ->
+        let todoList =
+            state.TodoList
+            |> List.map (fun todo ->
+                if todo.Id = id then
+                    { todo with EditDescription = edit }
+                else
+                    todo)
+
+        { state with TodoList = todoList }
 
     | SetNewTodo newTodo -> { state with NewTodo = newTodo }
     | DeleteTodo id ->
@@ -189,28 +205,29 @@ let renderTodo (todo: Todo) (dispatch: Msg -> unit) =
                                   prop.onClick (fun _ -> dispatch (DeleteTodo todo.Id))
                                   prop.children [ Html.i [ prop.classes [ "fa"; "fa-times" ] ] ] ] ] ] ] ]
 
-let renderEditForm (todo: Todo) todoBeingEdited dispatch =
+let renderEditForm (todo: Todo) dispatch =
     div
         [ "box" ]
         [ div
               [ "field"; "is-grouped" ]
               [ div
                     [ "control"; "is-expanded" ]
-                    [ controlledInput todoBeingEdited.Description (SetEditedDescription >> dispatch) ]
+                    [ controlledInput todo.EditDescription (fun desc ->
+                          dispatch (SetEditedDescription(todo.Id, desc))) ]
 
                 div
                     [ "control"; "buttons" ]
                     [ Html.button
                           [ prop.classes
                                 [ "button"
-                                  if todoBeingEdited.Description <> todo.Description then
+                                  if todo.Description <> todo.EditDescription then
                                       "is-primary" ]
-                            prop.onClick (fun _ -> dispatch ApplyEdit)
+                            prop.onClick (fun _ -> dispatch (ApplyEdit todo.Id))
                             prop.children [ Html.i [ prop.classes [ "fa"; "fa-save" ] ] ] ]
 
                       Html.button
                           [ prop.classes [ "button"; "is-warning" ]
-                            prop.onClick (fun _ -> dispatch CancelEdit)
+                            prop.onClick (fun _ -> dispatch (CancelEdit todo.Id))
                             prop.children [ Html.i [ prop.classes [ "fa"; "fa-arrow-right" ] ] ] ] ] ] ]
 
 let todoList state (dispatch: Msg -> unit) =
@@ -224,11 +241,7 @@ let todoList state (dispatch: Msg -> unit) =
 
     Html.ul
         [ prop.children
-              [ for todo in activeTodos ->
-                    match state.TodoBeingEdited with
-                    | Some todoBeingEdited when todoBeingEdited.Id = todo.Id ->
-                        renderEditForm todo todoBeingEdited dispatch
-                    | _ -> renderTodo todo dispatch ] ]
+              [ for todo in activeTodos -> if todo.BeingEdited then (renderEditForm todo dispatch) else renderTodo todo dispatch ] ]
 
 let renderFilterTabs (state: State) (dispatch: Msg -> unit) =
     div
