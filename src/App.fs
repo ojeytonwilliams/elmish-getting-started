@@ -189,7 +189,7 @@ let renderTodo (todo: Todo) (dispatch: Msg -> unit) =
                                   prop.onClick (fun _ -> dispatch (DeleteTodo todo.Id))
                                   prop.children [ Html.i [ prop.classes [ "fa"; "fa-times" ] ] ] ] ] ] ] ]
 
-let renderEditForm todoBeingEdited dispatch =
+let renderEditForm (todo: Todo) todoBeingEdited dispatch =
     div
         [ "box" ]
         [ div
@@ -197,15 +197,14 @@ let renderEditForm todoBeingEdited dispatch =
               [ div
                     [ "control"; "is-expanded" ]
                     [ controlledInput todoBeingEdited.Description (SetEditedDescription >> dispatch) ]
-                // [ Html.input
-                //       [ prop.classes [ "input"; "is-medium" ]
-                //         prop.valueOrDefault todoBeingEdited.Description
-                //         prop.onTextChange (SetEditedDescription >> dispatch) ] ]
 
                 div
                     [ "control"; "buttons" ]
                     [ Html.button
-                          [ prop.classes [ "button"; "is-primary" ]
+                          [ prop.classes
+                                [ "button"
+                                  if todoBeingEdited.Description <> todo.Description then
+                                      "is-primary" ]
                             prop.onClick (fun _ -> dispatch ApplyEdit)
                             prop.children [ Html.i [ prop.classes [ "fa"; "fa-save" ] ] ] ]
 
@@ -227,7 +226,8 @@ let todoList state (dispatch: Msg -> unit) =
         [ prop.children
               [ for todo in activeTodos ->
                     match state.TodoBeingEdited with
-                    | Some todoBeingEdited when todoBeingEdited.Id = todo.Id -> renderEditForm todoBeingEdited dispatch
+                    | Some todoBeingEdited when todoBeingEdited.Id = todo.Id ->
+                        renderEditForm todo todoBeingEdited dispatch
                     | _ -> renderTodo todo dispatch ] ]
 
 let renderFilterTabs (state: State) (dispatch: Msg -> unit) =
