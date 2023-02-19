@@ -1,0 +1,8 @@
+[phases.setup]
+nixPkgs = ['pnpm', 'fsharp']
+
+[phases.build]
+cmd = 'pnpm build'
+
+[start]
+cmd = 'pnpm start'
