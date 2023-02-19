@@ -10,7 +10,7 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "SolutionFiles", "SolutionFi
 		.gitignore = .gitignore
 		Nuget.Config = Nuget.Config
 		package.json = package.json
-		package-lock.json = package-lock.json
+		pnpm-lock.yaml = pnpm-lock.yaml
 		README.md = README.md
 		webpack.config.js = webpack.config.js
 	EndProjectSection
