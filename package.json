@@ -3,7 +3,8 @@
   "scripts": {
     "start": "serve dist",
     "dev": "dotnet fable watch src --run webpack-dev-server",
-    "build": "dotnet fable src && webpack"
+    "build": "dotnet fable src && webpack",
+    "postinstall": "dotnet tool restore"
   },
   "dependencies": {
     "react": "^17.0.2",
