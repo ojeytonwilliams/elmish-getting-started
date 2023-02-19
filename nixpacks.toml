@@ -1,8 +1,11 @@
 [phases.setup]
-nixPkgs = ['pnpm', 'fsharp']
+nixPkgs = ['nodePackages.pnpm']
+
+[phases.install]
+cmds = ['pnpm install']
 
 [phases.build]
-cmd = 'pnpm build'
+cmds = ['pnpm build']
 
 [start]
 cmd = 'pnpm start'
