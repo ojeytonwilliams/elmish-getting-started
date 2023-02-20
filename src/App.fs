@@ -17,10 +17,17 @@ module Cmd =
 
         Cmd.ofSub sub
 
+type Deferred<'t> =
+    | NotStarted
+    | InProgress
+    | Resolved of 't
+
+type DeferredRandom = Deferred<Result<double, string>>
+
 type State =
     { Count: int
       Loading: bool
-      RandomNumber: double }
+      RandomNumber: DeferredRandom }
 
 type AsyncOperationStatus<'t> =
     | Started
@@ -31,14 +38,14 @@ type Msg =
     | Decrement
     | IncrementDelayed
     | DecrementDelayed
-    | GenerateRandomNumber of AsyncOperationStatus<double>
+    | GenerateRandomNumber of AsyncOperationStatus<Result<double, string>>
 
 let rnd = System.Random()
 
 let init () =
     { Count = 0
       Loading = false
-      RandomNumber = 0 },
+      RandomNumber = NotStarted },
     Cmd.none
 
 
@@ -52,7 +59,7 @@ let generateRandomNumber () =
     async {
         let nextDouble = rnd.NextDouble()
         do! Async.Sleep 200
-        return GenerateRandomNumber(Finished nextDouble)
+        return GenerateRandomNumber(Finished(Ok nextDouble))
     }
 
 let update msg state =
@@ -67,8 +74,22 @@ let update msg state =
     | IncrementDelayed -> { state with Loading = true }, Cmd.fromAsync (delayedMsg Increment)
     | DecrementDelayed when state.Loading = true -> state, Cmd.none
     | DecrementDelayed -> state, Cmd.fromAsync (delayedMsg Decrement)
-    | GenerateRandomNumber Started -> state, generateRandomNumber () |> Cmd.fromAsync
-    | GenerateRandomNumber(Finished x) -> { state with RandomNumber = x }, Cmd.none
+    | GenerateRandomNumber Started when state.RandomNumber = InProgress -> state, Cmd.none
+    | GenerateRandomNumber Started ->
+        let task =
+            async {
+                let nextDouble = rnd.NextDouble()
+                do! Async.Sleep 200
+
+                if (nextDouble < 0.5) then
+                    let errMsg = sprintf "Failed! Random number %f was less than 0.5" nextDouble
+                    return GenerateRandomNumber(Finished(Error errMsg))
+                else
+                    return GenerateRandomNumber(Finished(Ok nextDouble))
+            }
+
+        { state with RandomNumber = InProgress }, Cmd.fromAsync (task)
+    | GenerateRandomNumber(Finished x) -> { state with RandomNumber = Resolved x }, Cmd.none
 
 let render (state: State) (dispatch: Msg -> unit) =
     printfn "rendering"
@@ -79,11 +100,27 @@ let render (state: State) (dispatch: Msg -> unit) =
         else
             Html.h1 state.Count
 
+    let randomBit (numberState: DeferredRandom) =
+        match numberState with
+        | NotStarted -> Html.h1 "Nothing yet"
+        | InProgress -> Html.h1 "Loading"
+        | Resolved (Ok number) ->
+            Html.h1 [
+                prop.style [ style.color.green ]
+                prop.text (sprintf "Successfully generated random number: %f" number)
+            ]
+
+        | Resolved (Error errorMsg) ->
+            Html.h1 [
+                prop.style [ style.color.crimson ]
+                prop.text errorMsg
+            ]
+
     Html.div
         [ Html.button
               [ prop.onClick (fun _ -> dispatch (GenerateRandomNumber Started))
                 prop.text "Randomize me" ]
-          Html.h1 state.RandomNumber
+          randomBit state.RandomNumber
           content
           Html.button [ prop.onClick (fun _ -> dispatch Increment); prop.text "Increment" ]
 
