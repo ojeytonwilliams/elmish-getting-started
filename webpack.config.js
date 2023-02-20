@@ -8,15 +8,12 @@
 var path = require('path');
 var webpack = require('webpack');
 var HtmlWebpackPlugin = require('html-webpack-plugin');
-var CopyWebpackPlugin = require('copy-webpack-plugin');
-var MiniCssExtractPlugin = require('mini-css-extract-plugin');
 
 var CONFIG = {
     // The tags to include the generated JS and CSS will be automatically injected in the HTML template
     // See https://github.com/jantimon/html-webpack-plugin
     indexHtmlTemplate: './src/index.html',
     fsharpEntry: './src/App.fs.js',
-    cssEntry: './src/style.scss',
     outputDir: './dist',
     assetsDir: './public',
     publicPath: '/', // Where the bundled files are accessible relative to server root
@@ -44,16 +41,9 @@ var commonPlugins = [
 ];
 
 module.exports = {
-    // In development, split the JavaScript and CSS files in order to
-    // have a faster HMR support. In production bundle styles together
-    // with the code because the MiniCssExtractPlugin will extract the
-    // CSS in a separate files.
-    entry: isProduction ? {
-        app: [resolve(CONFIG.fsharpEntry), resolve(CONFIG.cssEntry)]
-    } : {
-        app: [resolve(CONFIG.fsharpEntry)],
-        style: [resolve(CONFIG.cssEntry)]
-    },
+    entry: {
+        app: [resolve(CONFIG.fsharpEntry)]
+    } ,
     // Add a hash to the output file name in production
     // to prevent browser caching if code changes
     output: {
@@ -68,22 +58,8 @@ module.exports = {
             chunks: 'all'
         },
     },
-    // Besides the HtmlPlugin, we use the following plugins:
-    // PRODUCTION
-    //      - MiniCssExtractPlugin: Extracts CSS from bundle to a different file
-    //          To minify CSS, see https://github.com/webpack-contrib/mini-css-extract-plugin#minimizing-for-production
-    //      - CopyWebpackPlugin: Copies static assets to output directory
-    // DEVELOPMENT
-    //      - HotModuleReplacementPlugin: Enables hot reloading when code changes without refreshing
-    plugins: isProduction ?
-        commonPlugins.concat([
-            new MiniCssExtractPlugin({ filename: 'style.[contenthash].css' }),
-            new CopyWebpackPlugin({
-                patterns: [{
-                    from: resolve(CONFIG.assetsDir) }]
-                })
-        ])
-        : commonPlugins,
+
+    plugins: commonPlugins,
     // Configuration for webpack-dev-server
     devServer: {
         // Necessary when using non-hash client-side routing
@@ -101,20 +77,6 @@ module.exports = {
     // - file-loader: Moves files referenced in the code (fonts, images) into output folder
     module: {
         rules: [
-            {
-                test: /\.(sass|scss|css)$/,
-                use: [
-                    isProduction
-                        ? MiniCssExtractPlugin.loader
-                        : 'style-loader',
-                    'css-loader',
-                    'resolve-url-loader',
-                    {
-                        loader: 'sass-loader',
-                        options: { implementation: require('sass') }
-                    }
-                ],
-            },
             {
                 test: /\.(png|jpg|jpeg|gif|svg|woff|woff2|ttf|eot)(\?.*)?$/,
                 use: ['file-loader']
